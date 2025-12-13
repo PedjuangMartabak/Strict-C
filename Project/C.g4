@@ -354,6 +354,10 @@ typeQualifierList
     : typeQualifier+
     ;
 
+parameterTypeList
+    : parameterList (',' '...')?
+    ;
+
 parameterList
     : parameterDeclaration 
       (',' parameterDeclaration 
@@ -363,10 +367,6 @@ parameterList
           )? 
         )? 
       )?
-    ;
-
-parameterList
-    : parameterDeclaration (',' parameterDeclaration)*
     ;
 
 parameterDeclaration
