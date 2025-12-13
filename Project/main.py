@@ -4,9 +4,9 @@ import sys
 import subprocess  # Library untuk menjalankan perintah terminal (GCC)
 from antlr4 import *
 from antlr4.error.ErrorListener import ErrorListener
-from CLexer import CLexer
-from CParser import CParser
-from CVisitor import CVisitor
+from ANTLR.CLexer import CLexer
+from ANTLR.CParser import CParser
+from ANTLR.CVisitor import CVisitor
 
 # --- Custom Error Listener (Menangkap Pelanggaran Grammar) ---
 class StrictCErrorListener(ErrorListener):
