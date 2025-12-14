@@ -92,7 +92,7 @@ Untuk pengujian cepat pada satu file.
 ```bash
 python main.py main.c
 ```
-###📸 Scenarios
+### 📸 Scenarios
 Skenario 1: Proyek Gagal (Build Failed)
 Terdapat file helper.c yang melanggar aturan (misal: ada goto).
 ```bash
