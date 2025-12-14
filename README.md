@@ -32,7 +32,7 @@ StrictC menerapkan 4 aturan "harga mati" pada setiap file:
 4.  🧠 **Keep It Simple (Max 5 Params)**
     Fungsi dibatasi maksimal memiliki **5 parameter**.
 
-### New: Modular Project Features 📦
+### Modular Project Features 📦
 * **Recursive Scanning:** Otomatis mencari semua file `.c` dan `.h` dalam folder dan sub-folder.
 * **Header Validation:** File header (`.h`) juga diperiksa ketaatannya terhadap aturan StrictC.
 * **Automated Linking:** Jika validasi sukses, semua file sumber otomatis di-*link* menjadi satu executable menggunakan GCC.
