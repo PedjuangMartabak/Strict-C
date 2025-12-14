@@ -146,7 +146,8 @@ def main():
     while True:
         print(f"\n=== StrictC Compiler & Executor ===")
         print("Ketik nama file .c untuk di-scan dan dijalankan.")
-        target = input(f"Input File > ")
+        print("Ketik 'exit' atau 'q' untuk keluar program")
+        target = input(f"Input File/Exit > ").strip()
         
         if target.lower() in ['exit', 'quit', 'b', 'q']:
             print("Sampai jumpa!")
