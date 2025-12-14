@@ -9,51 +9,57 @@
 
 ## 📖 About StrictC
 
-**StrictC** adalah sebuah *Domain Specific Language* (DSL) yang dirancang sebagai *subset* dari bahasa pemrograman C standar (C11).
+**StrictC** adalah sebuah *Domain Specific Language* (DSL) dan *Build System* yang dirancang sebagai *subset* dari bahasa pemrograman C standar (C11).
 
 Berbeda dengan compiler C biasa yang membiarkan Anda menulis kode yang berantakan asalkan sintaksnya benar, **StrictC bertindak sebagai "Satpam Kualitas"**. Ia memodifikasi grammar dan logika parser untuk **menolak** kode yang melanggar prinsip *Clean Code* dan *Structured Programming*.
 
-Jika kode Anda "kotor", StrictC akan menolak untuk mengkompilasinya. Jika "bersih", StrictC akan memanggil GCC untuk menjalankannya.
+**StrictC menerapkan prinsip "Atomic Build":**
+StrictC memindai satu folder proyek sekaligus. Jika ada **SATU** saja file (baik `.c` maupun `.h`) yang "kotor", StrictC akan menolak mengkompilasi seluruh proyek. Hanya jika semua file "bersih", StrictC akan menggabungkan (*link*) semuanya dan memanggil GCC.
 
 ---
 
-## 🚀 Key Features (The Trinity + 1)
+## 🚀 Key Features
 
-StrictC menerapkan 4 aturan "harga mati" yang tidak bisa ditawar:
+### The Trinity of StrictC (Core Rules)
+StrictC menerapkan 4 aturan "harga mati" pada setiap file:
 
-### 1. 🚫 No Spaghetti Code (Anti-Goto)
-Perintah `goto` dihapus dari grammar bahasa. Anda dipaksa menggunakan struktur kontrol yang jelas (`if`, `for`, `while`) untuk alur program yang mudah dibaca.
+1.  🚫 **No Spaghetti Code (Anti-Goto)**
+    Perintah `goto` dihapus dari grammar bahasa. Anda dipaksa menggunakan struktur kontrol yang jelas (`if`, `for`, `while`).
+2.  🛡️ **Safety First (Mandatory Braces)**
+    Dilarang menulis *control flow* tanpa kurung kurawal. `if (x) return;` adalah **Error**. Wajib `if (x) { return; }`.
+3.  ✂️ **Keep It Short (Max 50 Lines)**
+    Satu fungsi tidak boleh lebih dari **50 baris** kode.
+4.  🧠 **Keep It Simple (Max 5 Params)**
+    Fungsi dibatasi maksimal memiliki **5 parameter**.
 
-### 2. 🛡️ Safety First (Mandatory Braces)
-Dilarang menulis *control flow* tanpa kurung kurawal.
-* ❌ **Salah:** `if (x) return;`
-* ✅ **Benar:** `if (x) { return; }`
-Ini mencegah bug fatal akibat kesalahan indentasi (*scope error*).
-
-### 3. ✂️ Keep It Short (Max 20 Lines)
-Satu fungsi tidak boleh lebih dari **20 baris** kode. Ini memaksa penerapan *Single Responsibility Principle* (SRP). Jika fungsi Anda terlalu panjang, pecah menjadi fungsi-fungsi kecil!
-
-### 4. 🧠 Keep It Simple (Max 5 Params)
-Fungsi dibatasi maksimal memiliki **5 parameter**. Jika Anda butuh lebih banyak data, gunakan `struct`.
+### New: Modular Project Features 📦
+* **Recursive Scanning:** Otomatis mencari semua file `.c` dan `.h` dalam folder dan sub-folder.
+* **Header Validation:** File header (`.h`) juga diperiksa ketaatannya terhadap aturan StrictC.
+* **Automated Linking:** Jika validasi sukses, semua file sumber otomatis di-*link* menjadi satu executable menggunakan GCC.
 
 ---
 
 ## 🛠️ Tech Stack & Architecture
 
 StrictC dibangun di atas teknologi berikut:
-
 * **Frontend:** [ANTLR v4](https://www.antlr.org/) (Lexer & Parser Generator)
-* **Backend Logic:** Python 3 (Visitor Pattern & Semantic Analysis)
+* **Backend Logic:** Python 3 (Visitor Pattern, Semantic Analysis, & Build System)
 * **Compiler Core:** GCC (GNU Compiler Collection) untuk eksekusi akhir.
 
-### Alur Kerja (Workflow)
+### Alur Kerja (Project Workflow)
 ```mermaid
-graph LR
-A[Source .c] --> B(StrictC Parser)
-B --> C{Validasi?}
-C -- Kotor --> D[❌ Tampilkan Error & Stop]
-C -- Bersih --> E[✅ Panggil GCC]
-E --> F[Run Program .exe]
+graph TD
+    A[Start: Input Folder] --> B[Recursive Scan .c & .h]
+    B --> C{Loop Check Files}
+    C --> D[Validasi Grammar & Logic]
+    D -- Error Found --> E[Tandai Project: DIRTY]
+    D -- Valid --> F[Tandai File: CLEAN]
+    F --> C
+    E --> C
+    C -- Selesai Loop --> G{Decision Gate}
+    G -- Ada File Error --> H[❌ BUILD FAILED & Stop]
+    G -- Semua Bersih --> I[✅ GCC Linking]
+    I --> J[Run Program .exe]
 ```
 ### 📥 Installation
 
@@ -73,56 +79,53 @@ antlr4 -Dlanguage=Python3 -visitor -listener C.g4
 
 ### 💻 Usage
 
-Jalankan program utama menggunakan Python:
+1. Scan Satu Proyek (Folder)
+
+Cara paling umum. StrictC akan mengecek seluruh folder, menggabungkan file, dan menjalankannya.
 ```bash
-python main.py
+python main.py .
+# Atau folder spesifik
+python main.py src/
 ```
-Anda akan melihat menu interaktif:
+2. Scan File Tunggal
+Untuk pengujian cepat pada satu file.
 ```bash
-=== StrictC Compiler & Executor ===
-Ketik nama file .c untuk di-scan dan dijalankan.
-Input File > hello_strict.c
+python main.py main.c
 ```
-Contoh Skenario
-1. Input: bad_code.c (Melanggar Aturan)
-      ```bash
-    void main() {
-        int x = 10;
-        if (x > 5) return; // Error: Tidak ada kurung kurawal {}
-        goto label;        // Error: Goto dilarang
-    }
-    ```
-   Output StrictC:
-    ```bash
-    >>> Scanning: bad_code.c
-        [PELANGGARAN] Baris 3:15 -> Control flow WAJIB menggunakan kurung kurawal '{}'.
-        [PELANGGARAN] Baris 4:4 -> Penggunaan 'goto' DILARANG keras di StrictC.
-    
-    !!! KOMPILASI DIBATALKAN: Kode tidak memenuhi standar StrictC !!!
-    ```
-2. Input: good_code.c (Clean Code)
-   ```bash
-   #include <stdio.h>
-    void sapa() {
-        printf("Halo, StrictC!\n");
-    }
-    
-    int main() {
-        sapa();
-        return 0;
-    }
-    ```
-   Output StrictC:
-   ```bash
-   >>> Scanning: good_code.c
-    [BERSIH] Kode Valid & Aman.
-    >>> StrictC mengizinkan eksekusi. Memanggil GCC...
-    >>> Kompilasi Sukses! Menjalankan program...
-    ----------------------------------------
-    Halo, StrictC!
-    
-    ----------------------------------------
-    ```
+###📸 Scenarios
+Skenario 1: Proyek Gagal (Build Failed)
+Terdapat file helper.c yang melanggar aturan (misal: ada goto).
+```bash
+>>> Scanning Directory: ./src
+  - Found: main.c
+  - Found: helper.c
+
+>>> Analyzing: src/helper.c
+    [PELANGGARAN] Baris 12:4 -> Penggunaan 'goto' DILARANG keras di StrictC.
+    [PELANGGARAN] Baris 25:1 -> Fungsi 'hitung_rumit' terlalu panjang (22 baris).
+
+!!! BUILD FAILED: 2 Pelanggaran ditemukan. Kompilasi dibatalkan. !!!
+```
+
+Skenario 2: Proyek Sukses (Build Succeeded)
+Semua file bersih. StrictC memanggil GCC.
+```bash
+>>> Scanning Directory: ./src
+  - Found: main.c
+  - Found: utils.c
+
+>>> Analyzing: src/main.c ... [BERSIH]
+>>> Analyzing: src/utils.c ... [BERSIH]
+
+>>> PROJECT STATUS: CLEAN (100%)
+>>> StrictC mengizinkan eksekusi. Memanggil GCC...
+>>> Linking: gcc src/main.c src/utils.c -o main
+>>> Running Program...
+----------------------------------------
+Halo, ini adalah output dari StrictC!
+Perhitungan: 10 + 20 = 30
+----------------------------------------
+```
 
 ### 👥 Authors
 
