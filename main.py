@@ -1,4 +1,3 @@
-import glob
 import os
 import sys
 import subprocess  # Library untuk menjalankan perintah terminal (GCC)
@@ -22,10 +21,16 @@ class StrictCErrorListener(ErrorListener):
             violation += "Penggunaan 'goto' DILARANG keras di StrictC."
         elif "mismatched input" in msg and "{" in msg:
             violation += "Control flow (if/while/for) WAJIB menggunakan kurung kurawal '{}'."
+        elif "missing '{'" in msg:
+            violation += "Blok kode (if/while/for/fungsi) WAJIB menggunakan kurung kurawal '{}'."
+        elif "missing ';'" in msg and "'{'" in msg:
+            violation += "Kurang titik koma ';' sebelum blok kode, atau format header fungsi salah."
         elif "extraneous input" in msg and "}" in msg:
             violation += "Fungsi atau Blok tidak boleh kosong."
         elif "parameterList" in str(recognizer) or "mismatched input ','" in msg:
              violation += "Jumlah parameter melebihi batas maksimal (Max 5)."
+        elif offendingSymbol and offendingSymbol.text == "<EOF>":
+             violation += "Akhir file tidak terduga. Kemungkinan ada kurung kurawal '}' yang kurang atau error sintaks sebelumnya merusak struktur parsing."
         else:
             # Fallback untuk error lain
             violation += f"Syntax Error: {msg}"
@@ -57,33 +62,37 @@ class DetailedCAnalyzer(CVisitor):
         self.function_count += 1
         func_name = self.get_function_name(ctx)
         
-        # Aturan: Fungsi Maksimal 20 Baris Statement
+        # Aturan: Fungsi Maksimal 50 Baris Statement
         body = ctx.compoundStatement()
         line_count = 0
         if body.blockItemList():
             line_count = len(body.blockItemList().blockItem())
 
-        if line_count > 20:
+        if line_count > 50:
             self.logic_violations.append(
-                f"Baris {ctx.start.line}: Fungsi '{func_name}' terlalu panjang ({line_count} baris). Maksimal 20 baris."
+                f"Baris {ctx.start.line}: Fungsi '{func_name}' terlalu panjang ({line_count} baris). Maksimal 50 baris."
             )
         
         return self.visitChildren(ctx)
 
 # --- 3. Fungsi Utama Analisis & Eksekusi ---
-def analyze_single_file(file_path):
+def analyze_file(file_path):
     print(f"\n>>> Scanning: {file_path}")
     
     try:
         input_stream = FileStream(file_path)
         lexer = CLexer(input_stream)
+        lexer.removeErrorListeners() # Hapus listener bawaan Lexer (menghilangkan noise token error)
+        
         stream = CommonTokenStream(lexer)
         parser = CParser(stream)
         
         # A. Pasang Error Listener Khusus StrictC
-        parser.removeErrorListeners() # Hapus listener bawaan console
+        parser.removeErrorListeners()
         strict_listener = StrictCErrorListener()
+        
         parser.addErrorListener(strict_listener)
+        lexer.addErrorListener(strict_listener)
         
         # B. Lakukan Parsing
         tree = None
@@ -104,60 +113,91 @@ def analyze_single_file(file_path):
             # --- JIKA ADA PELANGGARAN ---
             for v in all_violations:
                 print(f"    [PELANGGARAN] {v}")
-            print(f"\n!!! KOMPILASI DIBATALKAN: Kode tidak memenuhi standar StrictC !!!")
             return False 
         else:
-            # --- JIKA BERSIH -> EKSEKUSI ---
+            # --- JIKA BERSIH ---
             print(f"    [BERSIH] Kode Valid & Aman.")
-            
-            print(f">>> StrictC mengizinkan eksekusi. Memanggil GCC...")
-            
-            # Tentukan nama output file executable
-            output_name = os.path.splitext(file_path)[0]
-            if os.name == 'nt': 
-                output_name += ".exe" # Tambah .exe jika di Windows
-            
-            # 1. Compile menggunakan GCC
-            compile_cmd = ["gcc", file_path, "-o", output_name]
-            compile_process = subprocess.run(compile_cmd, capture_output=True, text=True)
-            
-            if compile_process.returncode == 0:
-                print(f">>> Kompilasi Sukses! Menjalankan program...\n")
-                print("-" * 40)
-                
-                # 2. Jalankan Program
-                run_cmd = f"./{output_name}"
-                if os.name == 'nt':
-                    run_cmd = output_name
-                
-                subprocess.run([run_cmd])
-                print("\n" + "-" * 40)
-            else:
-                print(f"Error Internal GCC:\n{compile_process.stderr}")
-            
             return True
 
     except Exception as e:
         print(f"    [SYSTEM ERROR] Gagal memproses file: {e}")
         return False
 
+def compile_and_run(source_files):
+    print(f"\n>>> StrictC mengizinkan eksekusi. Memanggil GCC...")
+    
+    # Tentukan nama output file executable (menggunakan nama file pertama)
+    output_name = os.path.splitext(source_files[0])[0]
+    if os.name == 'nt': 
+        output_name += ".exe" # Tambah .exe jika di Windows
+    
+    # 1. Compile menggunakan GCC (support multiple source files)
+    compile_cmd = ["gcc"] + source_files + ["-o", output_name]
+    compile_process = subprocess.run(compile_cmd, capture_output=True, text=True)
+    
+    if compile_process.returncode == 0:
+        print(f">>> Kompilasi Sukses! Menjalankan program...\n")
+        print("-" * 40)
+        
+        # 2. Jalankan Program
+        run_cmd = f"./{output_name}"
+        if os.name == 'nt':
+            run_cmd = output_name
+        
+        subprocess.run([run_cmd])
+        print("\n" + "-" * 40)
+    else:
+        print(f"Error Internal GCC:\n{compile_process.stderr}")
+
 # --- 4. User Interface ---
 def main():
-    while True:
-        print(f"\n=== StrictC Compiler & Executor ===")
-        print("Ketik nama file .c untuk di-scan dan dijalankan.")
-        print("Ketik 'exit' atau 'q' untuk keluar program")
-        target = input(f"Input File/Exit > ").strip()
-        
-        if target.lower() in ['exit', 'quit', 'b', 'q']:
-            print("Sampai jumpa!")
-            break
+    if len(sys.argv) < 2:
+        print("Usage: python main.py <file_or_directory> ...")
+        sys.exit(1)
+
+    targets = sys.argv[1:]
+    files_to_process = []
+    all_valid = True
+
+    # 1. Kumpulkan semua file target (support direktori rekursif)
+    for target in targets:
+        if os.path.isdir(target):
+            for root, _, files in os.walk(target):
+                for file in files:
+                    if file.endswith(".c") or file.endswith(".h"):
+                        files_to_process.append(os.path.join(root, file))
+        elif os.path.isfile(target):
+            files_to_process.append(target)
+        else:
+            print(f"Target '{target}' tidak ditemukan.")
+            all_valid = False
+
+    if not all_valid:
+        sys.exit(1)
+
+    if not files_to_process:
+        print("Tidak ada file .c atau .h yang ditemukan.")
+        return
+
+    source_files = []
+
+    # 2. Proses setiap file yang ditemukan
+    for file_path in files_to_process:
+        # Kumpulkan file .c untuk kompilasi
+        if file_path.endswith(".c"):
+            source_files.append(file_path)
             
-        if not os.path.exists(target):
-            print(f"File '{target}' tidak ditemukan.")
-            continue
-            
-        analyze_single_file(target)
+        # Analisis setiap file (baik .c maupun .h)
+        if not analyze_file(file_path):
+            all_valid = False
+
+    if all_valid:
+        if source_files:
+            compile_and_run(source_files)
+        else:
+            print(f"\n>>> Analisis Selesai. Tidak ada file source (.c) untuk dijalankan.")
+    else:
+        print(f"\n!!! KOMPILASI DIBATALKAN: Kode tidak memenuhi standar StrictC !!!")
 
 if __name__ == '__main__':
     main()
